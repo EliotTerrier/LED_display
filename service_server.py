@@ -21,7 +21,7 @@ XMLRunMonitoringTemplate='''<?xml version="1.0" encoding="utf-8"?>
       <RunState>RunPattern</RunState>
       <PatternRunType>ServiceJourneyPattern</PatternRunType>
       <JourneyPatternRef>9308</JourneyPatternRef>
-      <VehicleJourneyRef>930110</VehicleJourneyRef>
+      <VehicleJourneyRef>0</VehicleJourneyRef>
     </CurrentRunInfo>
     <RunningPatternState>OnDiversion</RunningPatternState>
     <NextRunInfo>
@@ -83,23 +83,36 @@ def runmonitoring_subscription():
     
 
 def runmonitoring_daemon():
+    global XMLRunMonitoringTemplate
 
     for IP in runmonitoring_ip_list:
-		
         port_to_use = runmonitoring_port_list[runmonitoring_ip_list.index(IP)]
         path_to_use = runmonitoring_path_list[runmonitoring_ip_list.index(IP)]
-        res = requests.post('http://' + IP + ':' + port_to_use + path_to_use,headers={'Content-type': 'application/xml'},data=bytearray(XMLRunMonitoringTemplate,encoding="utf-8"))
+
+        # Parse the XML string into an XML tree
+        tree = ET.ElementTree(ET.fromstring(XMLRunMonitoringTemplate))
+        root = tree.getroot()
+
+        # Find the VehicleJourneyRef element
+        for vehicleJourneyRef in root.iter('VehicleJourneyRef'):
+            # Increment the value by 1
+            vehicleJourneyRef.text = str(int(vehicleJourneyRef.text) + 1)
+
+        # Convert the XML tree back into a string
+        XMLRunMonitoringTemplate = ET.tostring(root, encoding='utf-8').decode('utf-8')
+
+        res = requests.post('http://' + IP + ':' + port_to_use + path_to_use, headers={'Content-type': 'application/xml'}, data=bytearray(XMLRunMonitoringTemplate, encoding="utf-8"))
         print("Run monitoring delivery to: " + str(IP) + " get status: " + str(res.status_code))
 
 
 def background_job():
     print("AVMS server started and waiting for client and/or delivery dispatch")
     while True:
-        print(("Total number of IPs in the list:", len(runmonitoring_ip_list)))
+        #print(("Total number of IPs in the list:", len(runmonitoring_ip_list)))
         rmd = threading.Thread(target=runmonitoring_daemon, name='Thread-rm')
         rmd.daemon = True
         rmd.start()
-        time.sleep(1)
+        time.sleep(2)
 
 
 # thread will automatically exit when the main program finishes
@@ -107,6 +120,6 @@ def background_job():
 if __name__ == '__main__':
 
     _thread.start_new_thread(background_job, ())
-    app.run(host="10.0.9.227", port=8000, debug=False)
+    app.run(host="192.168.1.103", port=8000, debug=False)
 	
 
